@@ -42,6 +42,18 @@ Nested, lowercase, hyphenated: `#topic/sub-topic`. Tags are cross-cutting facets
 ### Attachments & media
 Everything binary goes in `attachments/`, embedded with `![[file.png]]` / `![[file.pdf]]`. Page-specific references: `![[file.pdf#page=7]]`. Never inline binaries elsewhere.
 
+## Naming conventions
+
+The author has specific preferences here — follow them for every new file and folder, and match them when renaming (via the Obsidian CLI, per hard rule #1).
+
+- **Folders: `snake_case`.** Lowercase words joined by underscores, e.g. `my_folder_name`, `daily_notes`, `project_archive`. No spaces, no capitals, no hyphens in folder names.
+- **Filenames: no spaces.** Either of these two styles is acceptable, pick whichever reads best for the note:
+  - `PascalCase` — e.g. `BlahFileName.md`, `SourdoughRecipe.md`
+  - `kebab-case` — e.g. `blah-file-name.md`, `sourdough-recipe.md`
+- Don't mix separators inside a single filename (avoid `Blah_file-name.md`).
+- No dates in the title unless the note is a daily or meeting note.
+- The filename is the `[[wikilink]]` target and the H1, so keep it descriptive and readable.
+
 ### Other syntax
 - Headings start at `##` — the H1 is the filename.
 - Callouts: `> [!note]`, `> [!warning]`, `> [!tip]` (add `-`/`+` for collapsible).
@@ -65,8 +77,8 @@ obsidian move file="Recipe" to="30-resources/"      # move a note, updating link
 obsidian rename file="Recipe" name="Sourdough"      # rename, updating links
 
 # Create notes
-obsidian create name="Meeting notes" content="..."  # new note with content
-obsidian create name="Trip" template="Travel" open  # from a template, then open
+obsidian create name="meeting-notes" content="..."  # new note with content
+obsidian create name="TripPlanning" template="Travel" open  # from a template, then open
 
 # Read / open
 obsidian read file="Recipe"                          # print a note's content
@@ -97,7 +109,7 @@ There are 100+ subcommands; run `obsidian --help` (or `obsidian <group> --help`)
 - **Preserve the author's voice.** These are personal notes — don't smooth them into corporate prose or add throat-clearing intros/conclusions.
 - **No filler.** Skip "In this note we will explore." State the thing.
 - **Uncertainty stays visible.** If a note records an open question, leave it open. Don't resolve it with a guess.
-- **Filenames:** sentence case, spaces allowed, no dates in the title unless it's a daily/meeting note. The title is the link target — it should read naturally inside a sentence.
+- **Filenames & folders:** follow the [Naming conventions](#naming-conventions) above — `snake_case` folders, no-spaces filenames (`PascalCase` or `kebab-case`).
 - **Broken links:** flag them rather than silently creating stub notes.
 - **Before destructive actions** (delete, mass rename, overwrite): explain the impact and confirm.
 

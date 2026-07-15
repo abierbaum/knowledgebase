@@ -15,6 +15,12 @@
 .obsidian/*.cache
 .obsidian/plugins/*/data.json.bak
 
+# ── Plugin settings that churn / may hold secrets (synced via Obsidian Sync) ──
+# realclaudian's data.json stores live session state (open tabs, conversation
+# ids) and could hold credentials — keep it out of git. Other plugins' settings
+# (e.g. terminal keymaps) are stable config and stay tracked on purpose.
+.obsidian/plugins/realclaudian/data.json
+
 # NOTE: The following ARE committed on purpose so the vault is
 # reproducible (settings, enabled plugins, themes, graph/hotkeys):
 #   .obsidian/app.json, appearance.json, core-plugins.json,
