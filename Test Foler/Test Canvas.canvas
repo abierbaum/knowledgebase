@@ -1,9 +1,0 @@
-{
-	"nodes":[
-		{"id":"6213900e07dbb7b0","x":-500,"y":-360,"width":320,"height":360,"type":"file","file":"Test Foler/Testing Note.md"},
-		{"id":"9f1ed3fc1d3debf0","x":40,"y":-30,"width":250,"height":60,"type":"text","text":"Testing"}
-	],
-	"edges":[
-		{"id":"f99ae80be9bfcb5a","fromNode":"6213900e07dbb7b0","fromSide":"right","toNode":"9f1ed3fc1d3debf0","toSide":"top","color":"4"}
-	]
-}

@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────
+# .gitignore for an Obsidian vault (git-backed via obsidian-git)
+#
+# Strategy: commit your NOTES and portable CONFIG (settings, themes,
+# plugin list) so the vault is reproducible across machines, but
+# ignore per-device UI STATE, CACHES, TRASH, and secrets.
+# ─────────────────────────────────────────────────────────────
+
+# ── Obsidian: per-device UI state (churns constantly, not portable) ──
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# ── Obsidian: caches & transient files (regenerated automatically) ──
+.obsidian/cache
+.obsidian/*.cache
+.obsidian/plugins/*/data.json.bak
+
+# NOTE: The following ARE committed on purpose so the vault is
+# reproducible (settings, enabled plugins, themes, graph/hotkeys):
+#   .obsidian/app.json, appearance.json, core-plugins.json,
+#   community-plugins.json, graph.json, hotkeys.json, themes/
+# If you'd rather NOT sync app config at all, uncomment:
+# .obsidian/*
+# !.obsidian/community-plugins.json
+
+# ── Third-party plugin code (optional) ──
+# Kept by default so plugins load on a fresh clone. If you prefer to
+# let Obsidian re-download plugin binaries and only sync their
+# SETTINGS, uncomment these (data.json holds each plugin's settings):
+# .obsidian/plugins/*/main.js
+# .obsidian/plugins/*/styles.css
+# .obsidian/plugins/*/*.js.map
+
+# ── Obsidian trash & local assistant state ──
+.trash/
+.claudian/
+
+# ── Claude Code local overrides (keep shared config, ignore local) ──
+.claude/settings.local.json
+
+# ── Secrets — never commit ──
+.env
+.env.*
+*.key
+*.pem
+secrets/
+**/credentials*.json
+
+# ── OS / editor junk ──
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+*~
+.*.swp
+.idea/
+.vscode/
