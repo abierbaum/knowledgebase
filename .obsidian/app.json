@@ -3,5 +3,6 @@
   "newFileLocation": "current",
   "attachmentFolderPath": "./",
   "showUnsupportedFiles": true,
-  "showInlineTitle": false
+  "showInlineTitle": false,
+  "readableLineLength": false
 }

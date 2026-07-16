@@ -14,9 +14,29 @@ This is an **Obsidian vault**, not a code repository — a personal and business
 5. **Preserve frontmatter.** When editing a note, do not drop, reorder, or reformat existing frontmatter keys.
 6. **Small diffs.** Edit the paragraph, not the whole note. Rewrites destroy the record of what the author actually thought.
 
+## Skills index (`.claude/skills/`)
+
+Project skills live in `.claude/skills/` — each is a folder with a `SKILL.md` (the instructions) plus optional `references/` files (deep detail). **Consult the skill before writing the relevant syntax; don't work from memory.** Invoke via the Skill tool to load `SKILL.md`; only Read a `references/` file when `SKILL.md` points to it for the detail you need — they're large and rarely all relevant.
+
+| Skill | Load it when… | Deep references |
+|---|---|---|
+| `obsidian-markdown` | Creating or editing any `.md` note — wikilinks, embeds, callouts, frontmatter/properties, comments | `references/PROPERTIES.md` (property types), `EMBEDS.md` (embed syntax), `CALLOUTS.md` (callout types) |
+| `obsidian-cli` | Any vault operation via the `obsidian` CLI — move/rename (hard rule #1), search, create, tasks, properties; also plugin/theme debugging | — (`obsidian help` is the live command list) |
+| `obsidian-bases` | Touching a `.base` file — table/cards/list/map views, filters, formulas, summaries | `references/FUNCTIONS_REFERENCE.md` (formula functions) |
+| `json-canvas` | Touching a `.canvas` file — nodes, edges, groups, connections | `references/EXAMPLES.md` (complete canvas examples) |
+| `defuddle` | User gives a URL to read/analyze — cleaner and cheaper than WebFetch. Skip for URLs ending in `.md` | — |
+
+Routing:
+- Editing note *syntax* → `obsidian-markdown` first.
+- Moving, renaming, or searching *files* → `obsidian-cli` (never `mv`, per hard rule #1).
+- `.base` or `.canvas` file → the matching skill **before** opening the file; both formats break silently on invalid structure.
+- Fetching a web page → `defuddle` before reaching for WebFetch.
+
+Skill instructions cover generic Obsidian; **this file's conventions (frontmatter schema, naming, tags) are vault policy and win on conflict.**
+
 ## Obsidian Markdown format
 
-Obsidian is standard Markdown plus extensions. Use these idioms:
+Obsidian is standard Markdown plus extensions — full syntax lives in the `obsidian-markdown` skill. What follows is **this vault's policy**:
 
 ### Frontmatter (YAML properties)
 Metadata sits at the very top of a note, fenced by `---`. Every non-daily note gets at minimum:
@@ -56,11 +76,8 @@ The author has specific preferences here — follow them for every new file and 
 
 ### Other syntax
 - Headings start at `##` — the H1 is the filename.
-- Callouts: `> [!note]`, `> [!warning]`, `> [!tip]` (add `-`/`+` for collapsible).
-- Task lists: `- [ ]` / `- [x]`.
-- Math (LaTeX): inline `$x^2$`, block `$$...$$`.
 - Diagrams: ```mermaid``` fenced blocks, rendered natively. Prefer mermaid over prose for a flow, schema, or sequence. Don't add diagram plugins.
-- Hidden comments: `%% not shown in preview %%`.
+- Callouts, embeds, math, comments, task lists: see the `obsidian-markdown` skill.
 
 ## Obsidian CLI
 
@@ -68,39 +85,17 @@ The Obsidian desktop app ships a CLI (`obsidian ...`, v1.12.7+) that runs operat
 
 **Availability:** it must be enabled (Settings → General → Command line interface) and the app must be running. First check that it works — e.g. `obsidian --help` or a harmless `obsidian search query="test" limit=1`. If it errors with "Command line interface is not enabled" or isn't on PATH, do **not** use `mv`/`git mv`; ask the user to enable it or perform the move in the UI.
 
-**Parameter format:** `parameter=value` (quote values with spaces: `name="My Note"`). Flags like `open`, `overwrite`, `permanent` are bare switches. Target files with `file=<name>` (wikilink resolution) or `path="exact/path.md"`.
-
-Common tasks:
+The safety-critical commands:
 ```shell
 # Move / rename (LINK-PRESERVING — use these instead of mv/git mv)
 obsidian move file="Recipe" to="30-resources/"      # move a note, updating links
 obsidian rename file="Recipe" name="Sourdough"      # rename, updating links
-
-# Create notes
-obsidian create name="meeting-notes" content="..."  # new note with content
-obsidian create name="TripPlanning" template="Travel" open  # from a template, then open
-
-# Read / open
-obsidian read file="Recipe"                          # print a note's content
-obsidian open path="10-projects/Launch.md"           # open in the app
-
-# Search (vault-aware)
-obsidian search query="bottleneck" limit=10          # search notes
-obsidian search:context query="TODO"                 # grep-style contextual output
-
-# Templates
-obsidian templates                                   # list available templates
-obsidian template:read name="Meeting"                # print a template
-
-# Delete
-obsidian delete file="Scratch"                       # move to trash (recoverable)
-obsidian delete file="Scratch" permanent             # delete permanently
 ```
-There are 100+ subcommands; run `obsidian --help` (or `obsidian <group> --help`) to discover more.
+For everything else (create, read, search, templates, delete, tasks, properties — 100+ subcommands), load the `obsidian-cli` skill; it covers parameter syntax and the full command surface. `obsidian help` is always current.
 
 ## Enabled plugins
 
-- **Core:** Canvas (`.canvas` JSON — preserve node `id`s/coords exactly), Daily Notes, Templates, **Bases** (`.base` DB views — don't break `base` query blocks), Properties, Graph/Backlinks/Outgoing links/Tag pane/Outline/Bookmarks, Global search, Quick switcher, Sync, File recovery.
+- **Core:** Canvas (`.canvas` JSON — preserve node `id`s/coords exactly; `json-canvas` skill), Daily Notes, Templates, **Bases** (`.base` DB views — don't break `base` query blocks; `obsidian-bases` skill), Properties, Graph/Backlinks/Outgoing links/Tag pane/Outline/Bookmarks, Global search, Quick switcher, Sync, File recovery.
 - **Community:** `obsidian-git` (auto-commits & syncs — prefer incremental, commit-worthy changes), `terminal` (in-app shell), `realclaudian` (this assistant).
 - If ```dataview``` or ```base``` query blocks appear in a note, don't break them unless asked to change the query.
 

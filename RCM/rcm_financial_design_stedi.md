@@ -96,14 +96,55 @@ Insurance AR: $200 − $100 − $80 − $20 = **$0**. Patient AR: **$20**.
 ```mermaid
 erDiagram
     PATIENT_ACCOUNT ||--o{ ENCOUNTER : has
-    ENCOUNTER ||--o{ CHARGE : produces
-    CHARGE ||--o{ LEDGER_ENTRY : accrues
-    CHARGE ||--o{ CLAIM_LINE : "billed as"
-    CLAIM ||--o{ CLAIM_LINE : contains
-    CLAIM ||--o{ CLAIM_EVENT : "tracked by"
-    REMITTANCE ||--o{ REMITTANCE_LINE : contains
+    ENCOUNTER       ||--o{ CHARGE : produces
+    CHARGE          ||--o{ CLAIM_LINE : "billed as"
+    CHARGE          ||--o{ LEDGER_ENTRY : accrues
+    CLAIM           ||--o{ CLAIM_LINE : contains
+    CLAIM           ||--o{ CLAIM_EVENT : "tracked by"
+    CLAIM_LINE      ||--o| REMITTANCE_LINE : "matched on line control #"
+    REMITTANCE      ||--o{ REMITTANCE_LINE : contains
     REMITTANCE_LINE ||--o{ LEDGER_ENTRY : generates
-    CLAIM_LINE ||--o| REMITTANCE_LINE : "matched to"
+    LEDGER_ENTRY    ||--o| LEDGER_ENTRY : reverses
+
+    CHARGE {
+        id id PK
+        id encounter_id FK
+        string cpt
+        int billed_cents
+    }
+    CLAIM {
+        id id PK
+        string claim_control_number
+    }
+    CLAIM_LINE {
+        id id PK
+        id claim_id FK
+        id charge_id FK
+        string line_control_number
+    }
+    CLAIM_EVENT {
+        id id PK
+        id claim_id FK
+        string stedi_txn_id
+    }
+    REMITTANCE {
+        id id PK
+        string trace_number
+        json raw_835
+    }
+    REMITTANCE_LINE {
+        id id PK
+        id remittance_id FK
+        string line_control_number
+    }
+    LEDGER_ENTRY {
+        id id PK
+        id charge_id FK
+        string type
+        int amount_cents
+        string bucket
+        id reverses_entry_id FK
+    }
 ```
 
 |Entity|Purpose|
