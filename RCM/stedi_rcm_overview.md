@@ -1,3 +1,10 @@
+---
+title: Stedi for Revenue Cycle Management
+created: 2026-07-15
+tags: []
+status: growing
+---
+
 # Stedi for Revenue Cycle Management
 
 Site: [stedi.com](https://stedi.com) 
@@ -209,14 +216,49 @@ This is your core value: a single interface where RCM staff live all day, backed
 - **Credentialing and payer enrollment** to a dedicated service or in-house team.
 - **Patient statements and collections** to a patient-billing/payments solution, since Stedi is payer-facing only.
 
+---
 
-## Open Questions
+## 9. Open Questions
 
 * If we submit to payer and there is a secondary payer involved, how will that be processed?
 
+Seems to be something here about this: https://www.stedi.com/blog/how-to-balance-cob-claims  From this it looks like we can run checks to understand coordination of benefits and then we can use this to submit to the primary and after that go ahead and submit to the secondary and so on.  It would be nice to automate this somehow.
+
+---
+## 10. Design Considerations
+
+When we go through and implement this with Stedi the following are areas we should consider for the design
+
+#### Patient Records
+
+Include patient insurance details as discovered with stedi through insurance eligibility checks and also Cordination of Benefits (COB).
+
+Try to get all details from all payers and put that into the patient record so we know what is available.
+
+#### Coordination of Benefits Submission Process
+
+When a patient has more than one payer (for example, commercial as primary and Medicaid as secondary), **Stedi does not auto-forward the claim from the primary to the secondary payer**. We submit two separate claims through Stedi. The second one carries the primary payer's payment and adjustment data inside it, pulled from the primary's 835/ERA. Stedi is the transport for both claims and returns both ERAs; the orchestration and data mapping is ours to build.
+
+See: https://www.stedi.com/blog/how-to-balance-cob-claims 
+
+**The normal COB workflow (commercial primary → Medicaid secondary):**
+
+- **Submit the primary claim** (837 to the commercial payer). Standard claim, `paymentResponsibilityLevelCode` = `P`.
+- **Wait for the primary's 835 (ERA)** to come back through Stedi — what the commercial plan paid, what it adjusted or denied, and the reason codes (CARC/RARC).
+- **Build the secondary claim** (837 to Medicaid) — the same claim, now enriched with the primary's results:
+  - `subscriber.paymentResponsibilityLevelCode` → `S` (secondary; `T` for tertiary).
+  - `claimInformation.otherSubscriberInformation[]` → one entry per prior payer with the primary's `payerPaidAmount`, adjudication date, and any claim-level adjustments.
+  - `serviceLines[].lineAdjudicationInformation[]` → per-line detail from the primary's ERA: paid amount, adjustment codes/amounts, paid units, adjudication date.
+- **Submit the secondary claim** to Medicaid through Stedi. Medicaid sees what commercial already paid and covers the balance per its rules.
+- **Post the secondary ERA** and resolve any remaining balance.
+
+**What we own in the build:** detect that a secondary exists (from the COB / eligibility check at intake), hold the secondary claim until the primary ERA lands, extract the primary's paid and adjustment data, and assemble the secondary 837 with the COB fields populated. The primary's stored 835 is the data source for all of it.
+
+**One exception — automatic crossover:** some payer pairs forward the claim to the secondary automatically. **Medicare → Medicaid** (via the COBA program) commonly crosses over on its own, in which case submitting our own secondary claim creates a duplicate. **Commercial → Medicaid** (our example) usually does **not** cross over, so we submit the secondary ourselves. Whether crossover happens is payer/plan-specific, not a Stedi setting — confirm per payer and watch for duplicate-claim rejections as the sign it already happened.
+
 ---
 
-## 9. Suggested phasing
+## 11. Suggested phasing
 
 1. **Prove the loop in sandbox.** Stand up a Stedi sandbox account, generate test keys, and use Claude Code with `llms-full.txt` + the OpenAPI specs to build eligibility check → claim submit → 277CA → 835 against test payers. No PHI, no BAA needed yet.
 2. **Wire real-time eligibility into intake first.** It is the lowest-risk, highest-daily-value transaction and gives your team an immediate win.
@@ -227,7 +269,104 @@ This is your core value: a single interface where RCM staff live all day, backed
 
 ---
 
-## 10. Reference links
+## 12. Stedi terminology
+
+Stedi publishes an official [Glossary](https://www.stedi.com/docs/edi-platform/edi-essentials/glossary), but it lives in their **EDI Platform** docs and only covers raw X12 mechanics. There is **no healthcare-specific glossary** — clearinghouse concepts are defined inside each topic page of the [healthcare docs](https://www.stedi.com/docs/healthcare). The tables below collect them, grouped the way Stedi's data model is layered: payers, enrollments, the claims/eligibility workflow, the identifiers that tie it together, and the generic platform underneath.
+
+Naming conventions worth knowing:
+
+- **English noun first, X12 number as the tag.** A claim is an 837, a remittance is an 835, an eligibility check rides the 270/271 pair. Raw X12 endpoints exist alongside every JSON endpoint, but the product surface speaks English.
+- **"Check" means synchronous.** Every real-time request/response product is a *check* (eligibility check, COB check, insurance discovery check). Claims are the opposite: asynchronous and event-driven.
+- **Payer identity is triple-keyed.** Store the immutable *Stedi payer ID* in the database, display the *primary payer ID* (what's on the member card), and let *aliases* absorb the rest.
+- **Enrollment is one request per provider per payer per transaction type.** Going live on professional claims, eligibility, and ERAs with one payer = three enrollment requests.
+
+### Payer model
+
+| Term | What it means in Stedi | Where discussed |
+|---|---|---|
+| **Payer** | The insurance organization on the receiving end of a transaction. Its payer record carries `transactionSupport` per transaction type (supported / enrollment required / not supported), coverage types (medical/dental/vision), and operating states | [Supported payers](https://www.stedi.com/docs/healthcare/supported-payers) |
+| **Stedi payer ID** | Stedi's immutable internal ID for a payer — never changes even if the primary payer ID does. The one to persist in our database | [Payer IDs](https://www.stedi.com/docs/healthcare/supported-payers#payer-ids) |
+| **Primary payer ID** | The most commonly used ID for a payer, usually what appears on member ID cards; the recommended default when submitting | [Primary payer ID](https://www.stedi.com/docs/healthcare/supported-payers#primary-payer-id-recommended) |
+| **Payer ID alias** | Alternative IDs for the same payer — old IDs after changes, plan-specific IDs, other clearinghouses' IDs — all routed correctly | [Payer ID aliases](https://www.stedi.com/docs/healthcare/supported-payers#payer-id-aliases) |
+| **Payer Network** | The searchable public directory of payers and their per-transaction requirements; also available programmatically as the Payers API | [Payer Network](https://www.stedi.com/healthcare/network), [Payers API](https://www.stedi.com/docs/healthcare/api-reference/get-payers) |
+
+### Enrollment model
+
+| Term | What it means in Stedi | Where discussed |
+|---|---|---|
+| **Transaction enrollment** | Registering one provider to exchange one transaction type with one payer *through Stedi*. Not credentialing, not payer enrollment — see Section 3. Statuses: `DRAFT` → `PROVISIONING` → `LIVE`, with `STEDI_ACTION_REQUIRED` / `PROVIDER_ACTION_REQUIRED` / `REJECTED` / `CANCELED` along the way | [Transaction enrollment](https://www.stedi.com/docs/healthcare/transaction-enrollment), [FAQ](https://www.stedi.com/docs/healthcare/transaction-enrollment-faq) |
+| **Provider (enrollment record)** | The provider entity (name, NPI, tax ID, contact) you create in Stedi and attach enrollments to. Distinct from the providers inside a claim payload | [Enrollment requests](https://www.stedi.com/docs/healthcare/create-manage-transaction-enrollments) |
+| **Task** | An action item Stedi attaches to an enrollment when the payer needs something from you; assigning one flips the enrollment to `PROVIDER_ACTION_REQUIRED` | [Tasks and documents](https://www.stedi.com/docs/healthcare/transaction-enrollment-tasks-documents) |
+| **Document** | A file (signed form, voided check, etc.) uploaded against an enrollment | [Tasks and documents](https://www.stedi.com/docs/healthcare/transaction-enrollment-tasks-documents) |
+| **One-click enrollment** | Payers where Stedi handles the entire process with no signatures or documents beyond the request itself | [One-click enrollment](https://www.stedi.com/docs/healthcare/transaction-enrollment#one-click-enrollment) |
+
+### Claims and eligibility workflow
+
+Product noun first, X12 number as the tag — mirroring Stedi's own convention.
+
+| Term | X12 tag | What it means in Stedi | Where discussed |
+|---|---|---|---|
+| **Claim** | 837 | The central object: a request for payment with the patient, providers, diagnoses, and one or more service lines. Three flavors — professional (837P, CMS-1500), institutional (837I, UB-04), dental (837D) — submitted as JSON or raw X12 and tracked through edits → acknowledgment → status → remittance | [Intro to claim submission](https://www.stedi.com/docs/healthcare/intro-to-claim-submission) |
+| **Service line** | 837 loop 2400 | The line item within a claim: one procedure (CPT/HCPCS), its modifiers, units, charge, and diagnosis pointers. The grain at which adjudication and remittance detail come back | [Correlate service lines](https://www.stedi.com/docs/healthcare/receive-claim-responses#service-line) |
+| **Claim edits** | — | Stedi's pre-flight scrubbing; failures return synchronously so you fix and resubmit before the payer ever sees the claim | [Edits and repairs](https://www.stedi.com/docs/healthcare/claim-edits-and-repairs) |
+| **Claim acknowledgment** | 277CA | The accept/reject verdict at each hop (Stedi's edits first, then intermediaries and the payer front-end). Means accepted/rejected *for processing* — not approved or denied | [Acknowledgments overview](https://www.stedi.com/docs/healthcare/claim-responses-overview) |
+| **Claim status check** | 276/277 | Real-time "where is my claim in adjudication," for when an accepted claim has produced no remittance in the expected window | [Check claim status](https://www.stedi.com/docs/healthcare/check-claim-status) |
+| **Electronic Remittance Advice (ERA)** | 835 | The payer's post-adjudication statement of what it paid, adjusted, or denied, per claim and per service line, delivered around fund deposit. Enrollment always required. Not the patient-facing EOB or provider-facing EOP — the ERA is the electronic file | [Get and correlate ERAs](https://www.stedi.com/docs/healthcare/receive-claim-responses) |
+| **Adjustment & denial reason codes** | CARC / RARC | Claim Adjustment Reason Codes and Remittance Advice Remark Codes — the standardized codes inside ERAs explaining every adjustment or denial | [Claims code lists](https://www.stedi.com/docs/healthcare/claims-code-lists) |
+| **Claim attachment** | 275 | Supporting documentation (medical records, treatment plans) submitted alongside or after a claim | [Claim attachments](https://www.stedi.com/docs/healthcare/submit-claim-attachments) |
+| **Resubmit / cancel** | 837 frequency code | Correcting or voiding a previously submitted claim, using the claim frequency code and the payer's claim control number | [Resubmit or cancel claims](https://www.stedi.com/docs/healthcare/resubmit-cancel-claims) |
+| **Paper claims** | — | For payers with no electronic connection, Stedi prints and mails CMS-1500 / UB-04 forms on your behalf | [Submit paper claims](https://www.stedi.com/docs/healthcare/submit-paper-claims) |
+| **Crossover claim** | — | A claim adjudicated by one payer then auto-forwarded to another (e.g. Medicare + supplemental); signaled by claim status codes 19/20/21 on the ERA. See Section 10 | [Crossover claims](https://www.stedi.com/docs/healthcare/receive-claim-responses#crossover-claims) |
+| **Eligibility check** | 270/271 | The real-time coverage and benefits query: 270 request, 271 response (copays, deductibles, OOP max) | [Eligibility overview](https://www.stedi.com/docs/healthcare/eligibility-workflows-overview) |
+| **Batch eligibility** | 270/271 | Asynchronous eligibility checks in bulk, e.g. refreshing all of tomorrow's appointments overnight | [Batch eligibility checks](https://www.stedi.com/docs/healthcare/batch-refresh-eligibility-checks) |
+| **Service Type Code (STC)** | 271 | The benefit-category taxonomy eligibility runs on (e.g. 30 = health benefit plan coverage): what you query by and how the response is organized | [STCs and procedure codes](https://www.stedi.com/docs/healthcare/eligibility-stc-procedure-codes) |
+| **Insurance discovery check** | — | Finding active coverage from demographics alone when the payer is unknown. Slow (up to ~120 s); a backup, not primary verification | [Insurance discovery](https://www.stedi.com/docs/healthcare/insurance-discovery) |
+| **Coordination of benefits check (COB)** | — | Determining which of a patient's multiple plans is primary/secondary | [COB checks](https://www.stedi.com/docs/healthcare/coordination-of-benefits), [Interpret COB response](https://www.stedi.com/docs/healthcare/cob-response) |
+| **Medicare Beneficiary Identifier lookup (MBI)** | — | Retrieving a Medicare patient's MBI from demographics | [MBI lookup](https://www.stedi.com/docs/healthcare/mbi-lookup) |
+
+### Identifiers and correlation
+
+Mostly **our** IDs, echoed back by payers — the connective tissue between our EMR and Stedi's responses.
+
+| Term | What it means in Stedi | Where discussed |
+|---|---|---|
+| **National Provider Identifier (NPI)** | The unique federal ID every provider bills under. Type 1 = individual practitioner, Type 2 = organization | [NPI](https://www.stedi.com/docs/healthcare/national-provider-identifier) |
+| **Patient Control Number (PCN)** | Our claim-level ID (`claimInformation.patientControlNumber`), echoed back in the 277CA and the ERA — the primary join key. Match case-insensitively; some payers truncate values over 30 characters | [Correlate 835 ERA](https://www.stedi.com/docs/healthcare/receive-claim-responses#correlate-835-era) |
+| **Line Item Control Number** | Our service-line-level ID. Naming trap: submitted as `providerControlNumber` on professional/dental claims but `lineItemControlNumber` on institutional — and always returned as `lineItemControlNumber` | [Correlate service lines](https://www.stedi.com/docs/healthcare/receive-claim-responses#service-line) |
+| **Correlation ID** | Stedi's own tracking number assigned at submission (`claimReference.correlationId`); the fallback join key when no PCN was supplied | [Stedi's Correlation ID](https://www.stedi.com/docs/healthcare/receive-claim-responses#option-2-stedis-correlation-id) |
+| **Check / EFT trace number** | The ERA's link to the actual money movement, and the dedupe key: same trace number = duplicate ERA | [Duplicate ERAs](https://www.stedi.com/docs/healthcare/receive-claim-responses#duplicate-eras) |
+
+### Platform primitives
+
+The generic EDI pipe under the healthcare products.
+
+| Term | What it means in Stedi | Where discussed |
+|---|---|---|
+| **Transaction** | One logical X12 document (claim, acknowledgment, remittance…) in JSON-addressable form: `transactionId`, direction (INBOUND/OUTBOUND), and transaction set identifier. Everything we send or receive is one of these | [Poll transactions](https://www.stedi.com/docs/healthcare/api-reference/get-poll-transactions) |
+| **File execution** | The processing record of the physical EDI file; its `fileExecutionId` is how you retrieve a transaction's raw X12 | [Retrieve File Execution Input](https://www.stedi.com/docs/healthcare/api-reference/get-execution-input) |
+| **Webhook** | Push notification for processed transactions (new 277CAs, 835s) instead of polling. Retries up to 5× on failure, so dedupe on receipt | [Configure webhooks](https://www.stedi.com/docs/healthcare/configure-webhooks) |
+| **Event destination** | The newer structured eventing: thin events (`enrollment.activated`, `enrollment.task.assigned`, …) that say a resource changed; you fetch the details via API | [Events and schema](https://www.stedi.com/docs/healthcare/event-destinations-event-types) |
+| **Test mode** | Separate environment with test API keys: realistic simulation, no PHI, no BAA, free | [Test mode](https://www.stedi.com/docs/healthcare/test-mode) |
+| **Test payer & mocks** | Mark test claims with `usageIndicator: T` (X12 `ISA15`); test payer ID `STEDI` returns test acknowledgments and ERAs; mock eligibility requests return canned scenarios | [Test claims workflow](https://www.stedi.com/docs/healthcare/test-claims-workflow), [Mock requests](https://www.stedi.com/docs/healthcare/api-reference/mock-requests-eligibility-checks) |
+| **Claims view / eligibility views** | The portal's operational UIs: per-claim timelines with all associated responses; searchable eligibility history with a benefits table | [Claims view](https://www.stedi.com/docs/healthcare/claims-view), [Eligibility views](https://www.stedi.com/docs/healthcare/eligibility-views) |
+| **Integrated account** | Stedi's model for a platform/vendor (us, effectively) that embeds Stedi behind its own product and manages provider accounts underneath it | [Integrated accounts](https://www.stedi.com/docs/healthcare/integrated-account-overview) |
+| **Stedi Agent** | Portal AI that auto-resolves recoverable eligibility errors and answers payer questions | [Stedi Agent](https://www.stedi.com/docs/healthcare/stedi-agent) |
+| **MCP server** | Exposes payer search, eligibility checks, and troubleshooting as tools for AI agents; works with Claude Code | [MCP server](https://www.stedi.com/docs/healthcare/mcp-server) |
+
+### Underlying X12/EDI terms
+
+These come from the EDI layer Stedi's JSON APIs abstract away — you'll meet them in the portal's raw X12 view and in error messages. All are defined in the official [EDI Glossary](https://www.stedi.com/docs/edi-platform/edi-essentials/glossary):
+
+- **X12** — the standards body and the North American EDI format all HIPAA transactions use. **EDI** is the umbrella term for the exchange itself.
+- **Transaction set** — one business document (an 837 claim, an 835 remittance). The numbers we use everywhere (270/271, 835, 837…) are transaction set IDs.
+- **Interchange / functional group** — the envelope layers wrapping transaction sets in a file (`ISA`…`IEA`, `GS`…`GE`).
+- **Segment / element / composite / loop** — the record → field → sub-field → repeating-group structure inside a transaction set, delimited by `~`, `*`, and `:`.
+- **Specification (guide)** — the schema saying which segments/elements a transaction set must contain; payers publish companion guides that tighten the base HIPAA spec.
+- **Trading partner** — any party you exchange EDI with; in our world, the payers.
+
+---
+
+## 13. Reference links
 
 **Core Stedi docs:**
 - [Stedi developer docs (home)](https://www.stedi.com/docs/healthcare)
