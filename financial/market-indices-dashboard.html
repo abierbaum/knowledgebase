@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<!-- built with standalone-app-builder | tier: 2 (enhanced) | date: 2026-07-17 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Indices — Historical Dashboard</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"
+        integrity="sha384-XcdcwHqIPULERb2yDEM4R0XaQKU3YnDsrTmjACBZyfdVVqjh6xQ4/DCMd7XLcA6Y" crossorigin="anonymous"></script>
+
+<style>
+  /* ==== tokens ==== */
+  :root {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* Type scale (1.250 ratio) */
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+    --text-xl: 1.563rem;
+    --text-2xl: 1.953rem;
+
+    /* Spacing: 8px rhythm */
+    --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem; --sp-4: 1rem;
+    --sp-6: 1.5rem; --sp-8: 2rem; --sp-12: 3rem;
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+
+    /* Light theme (AA-checked pairs) */
+    --bg: #fafaf8;
+    --surface: #ffffff;
+    --border: #d9d9d4;
+    --text: #1a1a18;
+    --text-muted: #5c5c56;
+    --accent: #0f5c8c;
+    --accent-contrast: #ffffff;
+    --positive: #196b3a;
+    --negative: #a3312b;
+    --focus-ring: #0f5c8c;
+
+    /* Chart tokens (validated palette — see dataviz reference) */
+    --chart-surface: #fcfcfb;
+    --series-dow: #2a78d6;   /* categorical slot 1: blue */
+    --series-ndq: #008300;   /* categorical slot 2: green */
+    --chart-grid: #e1e0d9;   /* hairline gridline */
+    --chart-axis: #c3c2b7;   /* baseline / axis */
+    --chart-muted: #898781;  /* axis label ink */
+  }
+
+  [data-theme="dark"] {
+    --bg: #16181c;
+    --surface: #1f2229;
+    --border: #363a44;
+    --text: #e8e8e4;
+    --text-muted: #a0a09a;
+    --accent: #5aa9dd;
+    --accent-contrast: #10151a;
+    --positive: #62c98a;
+    --negative: #e4837d;
+    --focus-ring: #5aa9dd;
+
+    --chart-surface: #1a1a19;
+    --series-dow: #3987e5;   /* dark-stepped slot 1 */
+    --series-ndq: #008300;   /* slot 2 is mode-invariant */
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+    --chart-muted: #898781;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ==== app styles ====
+     System declaration: type scale 1.250 / 8px rhythm / palette per tokens.
+     Dense dashboard layout; charts wear the validated dataviz palette. */
+  main { max-width: 1200px; margin: 0 auto; padding: var(--sp-6) var(--sp-4) var(--sp-12); }
+  header.app { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4);
+    padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
+  header.app .sub { font-size: var(--text-sm); color: var(--text-muted); }
+  button.icon { background: none; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-2);
+    color: var(--text); cursor: pointer; font: inherit; }
+
+  /* Filter row — one row, above everything it scopes */
+  .filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-6);
+    margin-bottom: var(--sp-6); }
+  .filters .group { display: flex; align-items: center; gap: var(--sp-2); }
+  .filters .group-label { font-size: var(--text-sm); color: var(--text-muted); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    overflow: hidden; }
+  .seg button { background: var(--surface); border: none; border-right: 1px solid var(--border);
+    padding: var(--sp-1) var(--sp-3); font: inherit; font-size: var(--text-sm);
+    color: var(--text-muted); cursor: pointer; }
+  .seg button:last-child { border-right: none; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast); }
+
+  /* KPI row */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-4);
+    margin-bottom: var(--sp-6); }
+  @media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .tile { background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4); }
+  .tile .label { font-size: var(--text-sm); color: var(--text-muted); }
+  .tile .value { font-size: var(--text-xl); font-weight: 600; margin-top: var(--sp-1); }
+  .tile .delta { font-size: var(--text-sm); margin-top: var(--sp-1); }
+  .delta.up { color: var(--positive); }
+  .delta.down { color: var(--negative); }
+
+  /* Chart grid */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4);
+    margin-bottom: var(--sp-4); }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--chart-surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+  .card h2 { margin: 0 0 var(--sp-1); font-size: var(--text-base); font-weight: 600;
+    display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+  .card h2 .key { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+  .card h2 .endval { margin-left: auto; font-weight: 400; font-size: var(--text-sm);
+    color: var(--text-muted); }
+  .card .chart-note { font-size: var(--text-xs); color: var(--text-muted); margin: 0 0 var(--sp-2); }
+  /* Height includes the x-axis band (Chart.js draws axes inside the canvas) */
+  .chart-wrap { position: relative; height: 280px; }
+  .chart-wrap.tall { height: 320px; }
+  .chart-msg { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; color: var(--text-muted); font-size: var(--text-sm);
+    text-align: center; padding: var(--sp-4); }
+
+  .banner { background: var(--surface); border: 1px solid var(--negative);
+    border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4);
+    margin-bottom: var(--sp-4); font-size: var(--text-sm); display: none; }
+
+  /* Data table (accessible twin of the charts) */
+  details.table-view { margin-top: var(--sp-6); }
+  details.table-view summary { cursor: pointer; font-weight: 600; padding: var(--sp-2) 0; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--text-sm);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+  th, td { padding: var(--sp-1) var(--sp-3); text-align: right;
+    border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  th { color: var(--text-muted); font-weight: 600; }
+  th:first-child, td:first-child { text-align: left; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .footnote { font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--sp-6); }
+
+  @media print {
+    header.app button, .filters { display: none; }
+    body { background: #ffffff; color: #000000; }
+    details.table-view { open: true; }
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <div>
+    <strong>Market indices — historical dashboard</strong>
+    <div class="sub">Dow Jones Industrial Average &amp; NASDAQ Composite · year-end closes 1971–2024</div>
+  </div>
+  <button class="icon" id="theme-toggle" aria-label="Toggle theme">Theme</button>
+</header>
+<main id="app">
+  <div class="banner" id="offline-banner">
+    Charts could not load (the Chart.js CDN is unreachable — likely offline).
+    The data table at the bottom of the page still has every value.
+  </div>
+
+  <!-- Filter row: scopes every stat, chart, and table below it -->
+  <div class="filters" role="toolbar" aria-label="Dashboard filters">
+    <div class="group">
+      <span class="group-label" id="range-label">Range</span>
+      <div class="seg" role="group" aria-labelledby="range-label">
+        <button data-range="all" aria-pressed="true">All (1971–)</button>
+        <button data-range="30" aria-pressed="false">30y</button>
+        <button data-range="20" aria-pressed="false">20y</button>
+        <button data-range="10" aria-pressed="false">10y</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="group-label" id="scale-label">Scale</span>
+      <div class="seg" role="group" aria-labelledby="scale-label">
+        <button data-scale="linear" aria-pressed="true">Linear</button>
+        <button data-scale="logarithmic" aria-pressed="false">Log</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI tiles -->
+  <section class="kpis" aria-label="Key figures">
+    <div class="tile">
+      <div class="label">Dow Jones — 2024 close</div>
+      <div class="value" id="kpi-dow-close">—</div>
+      <div class="delta" id="kpi-dow-delta"></div>
+    </div>
+    <div class="tile">
+      <div class="label">NASDAQ — 2024 close</div>
+      <div class="value" id="kpi-ndq-close">—</div>
+      <div class="delta" id="kpi-ndq-delta"></div>
+    </div>
+    <div class="tile">
+      <div class="label">Dow Jones CAGR <span id="kpi-dow-cagr-range"></span></div>
+      <div class="value" id="kpi-dow-cagr">—</div>
+      <div class="delta" id="kpi-dow-mult"></div>
+    </div>
+    <div class="tile">
+      <div class="label">NASDAQ CAGR <span id="kpi-ndq-cagr-range"></span></div>
+      <div class="value" id="kpi-ndq-cagr">—</div>
+      <div class="delta" id="kpi-ndq-mult"></div>
+    </div>
+  </section>
+
+  <!-- Small multiples: one axis each, never dual-axis -->
+  <section class="grid2">
+    <div class="card">
+      <h2><span class="key" id="key-dow"></span>Dow Jones Industrial Average
+        <span class="endval tnum" id="end-dow"></span></h2>
+      <div class="chart-wrap"><canvas id="chart-dow" role="img"
+        aria-label="Line chart of Dow Jones Industrial Average year-end closes. Full values in the data table below."></canvas></div>
+    </div>
+    <div class="card">
+      <h2><span class="key" id="key-ndq"></span>NASDAQ Composite
+        <span class="endval tnum" id="end-ndq"></span></h2>
+      <div class="chart-wrap"><canvas id="chart-ndq" role="img"
+        aria-label="Line chart of NASDAQ Composite year-end closes. Full values in the data table below."></canvas></div>
+    </div>
+  </section>
+
+  <!-- Comparison on ONE axis: both series indexed to 100 at range start -->
+  <section>
+    <div class="card">
+      <h2>Growth comparison — indexed to 100 <span class="endval" id="index-base"></span></h2>
+      <p class="chart-note">Both indices rebased to 100 at the start of the selected range, so
+        percentage growth is comparable on a single axis.</p>
+      <div class="chart-wrap tall"><canvas id="chart-idx" role="img"
+        aria-label="Line chart comparing Dow Jones and NASDAQ growth, both indexed to 100 at the start of the selected range. Full values in the data table below."></canvas></div>
+    </div>
+  </section>
+
+  <!-- Table view: the WCAG-clean twin of every chart -->
+  <details class="table-view">
+    <summary>Data table (year-end closes &amp; annual change)</summary>
+    <table id="data-table" aria-label="Year-end closes and annual change">
+      <thead>
+        <tr><th scope="col">Year</th><th scope="col">DJIA close</th><th scope="col">DJIA YoY</th>
+            <th scope="col">NASDAQ close</th><th scope="col">NASDAQ YoY</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </details>
+
+  <p class="footnote">Embedded static data: year-end closing values 1971–2024, compiled
+    2026-07-17 from the model's training knowledge — figures are close but not audited to the
+    decimal, and nothing here is live. Verify against an authoritative source before using
+    for decisions. NASDAQ Composite began trading in February 1971 (base 100).</p>
+</main>
+
+<!-- ==== embedded data ==== -->
+<script type="application/json" id="app-data">
+{
+  "generated": "2026-07-17",
+  "note": "Year-end closing values from training knowledge; not live data.",
+  "years": [1971,1972,1973,1974,1975,1976,1977,1978,1979,1980,1981,1982,1983,1984,1985,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024],
+  "dow": [890.20,1020.02,850.86,616.24,852.41,1004.65,831.17,805.01,838.74,963.99,875.00,1046.54,1258.64,1211.57,1546.67,1895.95,1938.83,2168.57,2753.20,2633.66,3168.83,3301.11,3754.09,3834.44,5117.12,6448.27,7908.25,9181.43,11497.12,10786.85,10021.50,8341.63,10453.92,10783.01,10717.50,12463.15,13264.82,8776.39,10428.05,11577.51,12217.56,13104.14,16576.66,17823.07,17425.03,19762.60,24719.22,23327.46,28538.44,30606.48,36338.30,33147.25,37689.54,42544.22],
+  "nasdaq": [114.12,133.73,92.19,59.82,77.62,97.88,105.05,117.98,151.14,202.34,195.84,232.41,278.60,247.35,324.93,348.83,330.47,381.38,454.82,373.84,586.34,676.95,776.80,751.96,1052.13,1291.03,1570.35,2192.69,4069.31,2470.52,1950.40,1335.51,2003.37,2175.44,2205.32,2415.29,2652.28,1577.03,2269.15,2652.87,2605.15,3019.51,4176.59,4736.05,5007.41,5383.12,6903.39,6635.28,8972.60,12888.28,15644.97,10466.48,15011.35,19310.79]
+}
+</script>
+
+<script>
+"use strict";
+
+/* ---- safe storage (never call localStorage bare) ---- */
+const appStorage = (() => {
+  const mem = {};
+  let ok = false;
+  try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); ok = true; }
+  catch (_) { ok = false; }
+  return {
+    get: (k) => { try { return ok ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch (_) { return mem[k] ?? null; } },
+    set: (k, v) => { try { if (ok) localStorage.setItem(k, v); else mem[k] = v; } catch (_) { mem[k] = v; } },
+  };
+})();
+
+/* ---- theme: honor system preference, allow manual override ---- */
+(() => {
+  const saved = appStorage.get("theme");
+  const preferDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const initial = saved || (preferDark ? "dark" : "light");
+  document.documentElement.dataset.theme = initial;
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    appStorage.set("theme", next);
+  });
+})();
+
+const APP_DATA = JSON.parse(document.getElementById("app-data").textContent);
+
+/* ---- app logic ---- */
+const state = { range: "all", scale: "linear" };
+const charts = {};
+
+const fmtFull = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+const fmtInt  = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const fmtPct  = (v) => (v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(1) + "%";
+
+function cssVar(name) {
+  return getComputedStyle(document.body).getPropertyValue(name).trim();
+}
+
+function slice() {
+  const { years, dow, nasdaq } = APP_DATA;
+  let startIdx = 0;
+  if (state.range !== "all") {
+    const lastYear = years[years.length - 1];
+    const startYear = lastYear - Number(state.range);
+    startIdx = Math.max(0, years.findIndex((y) => y >= startYear));
+  }
+  return {
+    years: years.slice(startIdx),
+    dow: dow.slice(startIdx),
+    nasdaq: nasdaq.slice(startIdx),
+  };
+}
+
+/* Crosshair: a vertical hairline snapped to the active X */
+const crosshair = {
+  id: "crosshair",
+  afterDatasetsDraw(chart) {
+    const active = chart.tooltip && chart.tooltip.getActiveElements();
+    if (!active || !active.length) return;
+    const x = active[0].element.x;
+    const { top, bottom } = chart.chartArea;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.strokeStyle = cssVar("--chart-axis");
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
+function hexToRgba(hex, alpha) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+function baseOptions(showLegend, tickFmt) {
+  const muted = cssVar("--chart-muted");
+  const grid = cssVar("--chart-grid");
+  const surface = cssVar("--chart-surface");
+  const text = cssVar("--text");
+  const border = cssVar("--border");
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: showLegend
+        ? { position: "top", align: "start",
+            labels: { color: text, boxWidth: 16, boxHeight: 2, font: { size: 12 } } }
+        : { display: false },
+      tooltip: {
+        backgroundColor: surface,
+        titleColor: text,
+        bodyColor: text,
+        borderColor: border,
+        borderWidth: 1,
+        boxWidth: 12,
+        boxHeight: 2,
+        padding: 10,
+        callbacks: {
+          label(ctx) {
+            return ` ${ctx.dataset.label}: ${fmtFull.format(ctx.parsed.y)}`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { color: cssVar("--chart-axis") },
+        ticks: { color: muted, maxTicksLimit: 8, maxRotation: 0, font: { size: 11 } },
+      },
+      y: {
+        type: state.scale,
+        grid: { color: grid, lineWidth: 1 },
+        border: { display: false },
+        ticks: { color: muted, maxTicksLimit: 6, font: { size: 11 },
+          callback: (v) => tickFmt(v) },
+      },
+    },
+  };
+}
+
+/* 2px line, no dots except an ≥8px end-marker with a 2px surface ring */
+function lineDataset(label, data, color, withFill) {
+  const surface = cssVar("--chart-surface");
+  const last = data.length - 1;
+  return {
+    label,
+    data,
+    borderColor: color,
+    borderWidth: 2,
+    borderJoinStyle: "round",
+    borderCapStyle: "round",
+    tension: 0,
+    fill: withFill,
+    backgroundColor: withFill ? hexToRgba(color, 0.1) : undefined,
+    pointRadius: (ctx) => (ctx.dataIndex === last ? 4 : 0),
+    pointBackgroundColor: color,
+    pointBorderColor: surface,
+    pointBorderWidth: 2,
+    pointHoverRadius: 5,
+    pointHoverBackgroundColor: color,
+    pointHoverBorderColor: surface,
+    pointHoverBorderWidth: 2,
+    pointHitRadius: 12,
+  };
+}
+
+function yTickFmt(v) {
+  if (v >= 1000) return fmtInt.format(v);
+  return String(v);
+}
+
+function makeChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+function renderCharts() {
+  const s = slice();
+  const dowColor = cssVar("--series-dow");
+  const ndqColor = cssVar("--series-ndq");
+
+  makeChart("chart-dow", {
+    type: "line",
+    data: { labels: s.years, datasets: [lineDataset("DJIA", s.dow, dowColor, true)] },
+    options: baseOptions(false, yTickFmt),
+    plugins: [crosshair],
+  });
+
+  makeChart("chart-ndq", {
+    type: "line",
+    data: { labels: s.years, datasets: [lineDataset("NASDAQ", s.nasdaq, ndqColor, true)] },
+    options: baseOptions(false, yTickFmt),
+    plugins: [crosshair],
+  });
+
+  const dowIdx = s.dow.map((v) => +(v / s.dow[0] * 100).toFixed(1));
+  const ndqIdx = s.nasdaq.map((v) => +(v / s.nasdaq[0] * 100).toFixed(1));
+  makeChart("chart-idx", {
+    type: "line",
+    data: {
+      labels: s.years,
+      datasets: [
+        lineDataset("DJIA (indexed)", dowIdx, dowColor, false),
+        lineDataset("NASDAQ (indexed)", ndqIdx, ndqColor, false),
+      ],
+    },
+    options: baseOptions(true, yTickFmt),
+    plugins: [crosshair],
+  });
+
+  /* Direct end-labels live in the card headers (text tokens, not series color) */
+  document.getElementById("key-dow").style.background = dowColor;
+  document.getElementById("key-ndq").style.background = ndqColor;
+  const lastY = s.years[s.years.length - 1];
+  document.getElementById("end-dow").textContent =
+    `${fmtFull.format(s.dow[s.dow.length - 1])} (${lastY})`;
+  document.getElementById("end-ndq").textContent =
+    `${fmtFull.format(s.nasdaq[s.nasdaq.length - 1])} (${lastY})`;
+  document.getElementById("index-base").textContent = `base year ${s.years[0]}`;
+}
+
+function setDelta(id, value, suffix) {
+  const el = document.getElementById(id);
+  el.textContent = "";
+  const up = value >= 0;
+  el.className = "delta " + (up ? "up" : "down");
+  el.appendChild(document.createTextNode(
+    (up ? "▲ " : "▼ ") + fmtPct(value) + " " + suffix));
+}
+
+function renderKpis() {
+  const { years, dow, nasdaq } = APP_DATA;
+  const n = years.length;
+  document.getElementById("kpi-dow-close").textContent = fmtFull.format(dow[n - 1]);
+  document.getElementById("kpi-ndq-close").textContent = fmtFull.format(nasdaq[n - 1]);
+  setDelta("kpi-dow-delta", dow[n - 1] / dow[n - 2] - 1, `vs ${years[n - 2]}`);
+  setDelta("kpi-ndq-delta", nasdaq[n - 1] / nasdaq[n - 2] - 1, `vs ${years[n - 2]}`);
+
+  const s = slice();
+  const yrs = s.years[s.years.length - 1] - s.years[0];
+  const rangeTxt = `(${s.years[0]}–${s.years[s.years.length - 1]})`;
+  document.getElementById("kpi-dow-cagr-range").textContent = rangeTxt;
+  document.getElementById("kpi-ndq-cagr-range").textContent = rangeTxt;
+  if (yrs < 1) return;
+  const dowCagr = Math.pow(s.dow[s.dow.length - 1] / s.dow[0], 1 / yrs) - 1;
+  const ndqCagr = Math.pow(s.nasdaq[s.nasdaq.length - 1] / s.nasdaq[0], 1 / yrs) - 1;
+  document.getElementById("kpi-dow-cagr").textContent = fmtPct(dowCagr) + "/yr";
+  document.getElementById("kpi-ndq-cagr").textContent = fmtPct(ndqCagr) + "/yr";
+  document.getElementById("kpi-dow-mult").textContent =
+    (s.dow[s.dow.length - 1] / s.dow[0]).toFixed(1) + "× over " + yrs + " years";
+  document.getElementById("kpi-ndq-mult").textContent =
+    (s.nasdaq[s.nasdaq.length - 1] / s.nasdaq[0]).toFixed(1) + "× over " + yrs + " years";
+  document.getElementById("kpi-dow-mult").className = "delta";
+  document.getElementById("kpi-ndq-mult").className = "delta";
+}
+
+function renderTable() {
+  const s = slice();
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.textContent = "";
+  const { years, dow, nasdaq } = APP_DATA;
+  for (let i = s.years.length - 1; i >= 0; i--) {
+    const gIdx = years.indexOf(s.years[i]);
+    const tr = document.createElement("tr");
+    const cells = [
+      String(s.years[i]),
+      fmtFull.format(s.dow[i]),
+      gIdx > 0 ? fmtPct(dow[gIdx] / dow[gIdx - 1] - 1) : "—",
+      fmtFull.format(s.nasdaq[i]),
+      gIdx > 0 ? fmtPct(nasdaq[gIdx] / nasdaq[gIdx - 1] - 1) : "—",
+    ];
+    for (const c of cells) {
+      const td = document.createElement("td");
+      td.textContent = c;
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+function renderAll() {
+  renderKpis();
+  renderTable();
+  if (typeof Chart !== "undefined") renderCharts();
+}
+
+/* Filters: segmented buttons, aria-pressed reflects state */
+function wireSeg(attr, key) {
+  document.querySelectorAll(`[data-${attr}]`).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state[key] = btn.dataset[attr];
+      document.querySelectorAll(`[data-${attr}]`).forEach((b) =>
+        b.setAttribute("aria-pressed", String(b === btn)));
+      renderAll();
+    });
+  });
+}
+wireSeg("range", "range");
+wireSeg("scale", "scale");
+
+/* Re-render charts after the theme flips (listener added after the shell's) */
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  if (typeof Chart !== "undefined") renderCharts();
+});
+
+if (typeof Chart === "undefined") {
+  document.getElementById("offline-banner").style.display = "block";
+  document.querySelectorAll(".chart-wrap").forEach((w) => {
+    const msg = document.createElement("div");
+    msg.className = "chart-msg";
+    msg.textContent = "Chart unavailable offline — see the data table below.";
+    w.appendChild(msg);
+  });
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -79,6 +79,8 @@ The author has specific preferences here — follow them for every new file and 
 ### Other syntax
 - Headings start at `##` — the H1 is the filename.
 - Diagrams: ```mermaid``` fenced blocks, rendered natively. Prefer mermaid over prose for a flow, schema, or sequence. Don't add diagram plugins.
+  - Stick to mermaid features Obsidian's bundled renderer supports; when in doubt, prefer plain syntax over fancy.
+  - Mermaid parses node labels as markdown: a label (or `<br/>`-separated line) starting with `1.` / `1)` / `-` renders as "Unsupported markdown: list" instead of the diagram. Number nodes like `Step 1 —` / `Layer 1 —` instead.
 - Callouts, embeds, math, comments, task lists: see the `obsidian-markdown` skill.
 
 ## Obsidian CLI
