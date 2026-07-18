@@ -1,0 +1,80 @@
+{
+  "skill": "standalone-app-builder",
+  "cases": [
+    {
+      "id": "tier1-routing",
+      "prompt": "Make me a little tool that converts between mg and mcg doses and back",
+      "expect": [
+        "Declares Tier 1 in one sentence before code",
+        "Zero external script tags",
+        "Single .html file written to ./, opens with no console errors",
+        "Copy button with inline confirmation, no alert()"
+      ]
+    },
+    {
+      "id": "tier2-dashboard-data",
+      "prompt": "Here's a CSV of monthly session counts by district: [paste]. Build a dashboard.",
+      "expect": [
+        "Declares Tier 2",
+        "Chart.js tag matches manifest verbatim including integrity",
+        "CSV converted to JSON in an application/json script block",
+        "KPI cards + charts with explicit-height wrappers",
+        "Reports file size"
+      ]
+    },
+    {
+      "id": "tier3-mockup",
+      "prompt": "Mock up an app for parents to review and sign consent forms, three screens",
+      "expect": [
+        "Declares Tier 3",
+        "React 18 UMD + Babel + Tailwind tags match manifest",
+        "One babel block, ErrorBoundary wraps mount, appStorage used",
+        "Screen navigation is state, not hrefs",
+        "Synthetic data only, no realistic PII"
+      ]
+    },
+    {
+      "id": "off-manifest-library",
+      "prompt": "Build a Gantt chart page using frappe-gantt",
+      "expect": [
+        "Does NOT inline an unmanifested CDN URL",
+        "Surfaces that frappe-gantt is not in the manifest and asks, offering alternatives (Mermaid gantt, custom D3)"
+      ]
+    },
+    {
+      "id": "needs-real-build",
+      "prompt": "Build me a multi-page site with client-side routing, auth, and a Postgres backend as a single HTML file",
+      "expect": [
+        "Declines the single-file framing, explains why, recommends a real project",
+        "Offers the closest single-file alternative (state-based screens mockup)"
+      ]
+    },
+    {
+      "id": "explicit-tier-override",
+      "prompt": "Just vanilla JS please, no libraries: an interactive checklist for our EKS deploy runbook",
+      "expect": [
+        "Tier 1 despite checklist state complexity",
+        "No CDN tags at all",
+        "appStorage persists checklist state"
+      ]
+    },
+    {
+      "id": "iterate-existing",
+      "prompt": "Here's the dashboard.html you made. Add a filter by district dropdown.",
+      "expect": [
+        "Edits the existing file in place, same tier, no shell reset",
+        "No new CDN entries without need",
+        "Re-runs verification"
+      ]
+    },
+    {
+      "id": "design-forward-directions",
+      "prompt": "Design a landing page mockup for a school telehealth service, I'm open on style",
+      "expect": [
+        "Offers 2-3 named directions before building",
+        "After a pick, commits to that system and states it",
+        "No banned slop patterns in the output"
+      ]
+    }
+  ]
+}

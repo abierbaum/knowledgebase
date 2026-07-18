@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<!-- built with standalone-app-builder v0.1.0 | tier: 1 (vanilla) | date: 2026-07-17 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dose Converter</title>
+<style>
+  /* ==== tokens (from assets/theme.css; keep in sync) ==== */
+  :root {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+    --text-xl: 1.563rem;
+    --text-2xl: 1.953rem;
+    --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem; --sp-4: 1rem;
+    --sp-6: 1.5rem; --sp-8: 2rem; --sp-12: 3rem;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --bg: #fafaf8;
+    --surface: #ffffff;
+    --border: #d9d9d4;
+    --text: #1a1a18;
+    --text-muted: #5c5c56;
+    --accent: #0f5c8c;
+    --accent-contrast: #ffffff;
+    --positive: #196b3a;
+    --negative: #a3312b;
+    --focus-ring: #0f5c8c;
+  }
+  [data-theme="dark"] {
+    --bg: #16181c;
+    --surface: #1f2229;
+    --border: #363a44;
+    --text: #e8e8e4;
+    --text-muted: #a0a09a;
+    --accent: #5aa9dd;
+    --accent-contrast: #10151a;
+    --positive: #62c98a;
+    --negative: #e4837d;
+    --focus-ring: #5aa9dd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ==== app styles ==== */
+  /* System declaration: type scale 1.250 / 8px rhythm / palette per tokens */
+  main { max-width: 480px; margin: 0 auto; padding: var(--sp-6) var(--sp-4); }
+  header.app { display: flex; align-items: center; justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
+  button.icon { background: none; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-2);
+    color: var(--text); cursor: pointer; font: inherit; }
+  .card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: var(--sp-6); }
+  .card h2 { margin: 0 0 var(--sp-4); font-size: var(--text-lg); }
+  .field { margin-bottom: var(--sp-4); }
+  .field label { display: block; font-size: var(--text-sm);
+    color: var(--text-muted); margin-bottom: var(--sp-1); }
+  .field input { width: 100%; font: inherit; font-variant-numeric: tabular-nums;
+    padding: var(--sp-2) var(--sp-3); color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .field .err { margin: var(--sp-1) 0 0; font-size: var(--text-xs);
+    color: var(--negative); }
+  .result-row { display: flex; align-items: center; gap: var(--sp-2);
+    border-top: 1px solid var(--border); padding-top: var(--sp-4); }
+  .result-row output { flex: 1; font-size: var(--text-sm); }
+  .flash { font-size: var(--text-xs); color: var(--positive);
+    opacity: 0; transition: opacity 0.15s; }
+  .flash.on { opacity: 1; }
+
+  @media print {
+    header.app button, .result-row button { display: none; }
+    body { background: #ffffff; color: #000000; }
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <strong>Dose Converter</strong>
+  <button class="icon" id="theme-toggle" aria-label="Toggle theme">Theme</button>
+</header>
+<main id="app">
+  <section class="card">
+    <h2>mg &#8596; mcg</h2>
+    <div class="field">
+      <label for="mg">Milligrams (mg)</label>
+      <input id="mg" type="text" inputmode="decimal" placeholder="e.g. 0.5" autocomplete="off">
+      <p class="err" id="mg-err" hidden>Enter a number</p>
+    </div>
+    <div class="field">
+      <label for="mcg">Micrograms (mcg)</label>
+      <input id="mcg" type="text" inputmode="decimal" placeholder="e.g. 500" autocomplete="off">
+      <p class="err" id="mcg-err" hidden>Enter a number</p>
+    </div>
+    <div class="result-row">
+      <output id="summary" class="tnum" aria-live="polite">Type in either field to convert.</output>
+      <span class="flash" id="copied">Copied</span>
+      <button class="icon" id="copy" type="button">Copy</button>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* ---- safe storage (never call localStorage bare) ---- */
+const appStorage = (() => {
+  const mem = {};
+  let ok = false;
+  try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); ok = true; }
+  catch (_) { ok = false; }
+  return {
+    get: (k) => { try { return ok ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch (_) { return mem[k] ?? null; } },
+    set: (k, v) => { try { if (ok) localStorage.setItem(k, v); else mem[k] = v; } catch (_) { mem[k] = v; } },
+  };
+})();
+
+/* ---- theme ---- */
+(() => {
+  const saved = appStorage.get("theme");
+  const preferDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = saved || (preferDark ? "dark" : "light");
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    appStorage.set("theme", next);
+  });
+})();
+
+/* ---- app logic ---- */
+(() => {
+  const mg = document.getElementById("mg");
+  const mcg = document.getElementById("mcg");
+  const summary = document.getElementById("summary");
+  const copyBtn = document.getElementById("copy");
+  const copied = document.getElementById("copied");
+
+  const fmt = (n) => {
+    if (!isFinite(n)) return "";
+    return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  };
+  const parse = (s) => {
+    const v = Number(s.replace(/,/g, "").trim());
+    return s.trim() === "" || isNaN(v) ? null : v;
+  };
+  const showErr = (input, on) => {
+    document.getElementById(input.id + "-err").hidden = !on;
+    input.setAttribute("aria-invalid", on ? "true" : "false");
+  };
+
+  function convert(from) {
+    const [src, dst, factor] = from === "mg" ? [mg, mcg, 1000] : [mcg, mg, 1 / 1000];
+    if (src.value.trim() === "") {
+      showErr(src, false); dst.value = "";
+      summary.textContent = "Type in either field to convert.";
+      return;
+    }
+    const v = parse(src.value);
+    if (v === null) { showErr(src, true); summary.textContent = ""; return; }
+    showErr(src, false); showErr(dst, false);
+    const out = v * factor;
+    dst.value = fmt(out);
+    const mgVal = from === "mg" ? v : out;
+    const mcgVal = from === "mg" ? out : v;
+    summary.textContent = `${fmt(mgVal)} mg = ${fmt(mcgVal)} mcg`;
+  }
+
+  mg.addEventListener("input", () => convert("mg"));
+  mcg.addEventListener("input", () => convert("mcg"));
+
+  function flash() {
+    copied.classList.add("on");
+    setTimeout(() => copied.classList.remove("on"), 1200);
+  }
+  copyBtn.addEventListener("click", () => {
+    const text = summary.textContent;
+    if (!text || text.startsWith("Type")) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(flash, () => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  });
+  function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); flash(); } catch (_) {}
+    ta.remove();
+  }
+})();
+</script>
+</body>
+</html>

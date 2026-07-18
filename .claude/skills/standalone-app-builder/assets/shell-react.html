@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<!-- built with standalone-app-builder vSKILL_VERSION | tier: 3 (react) | date: BUILD_DATE -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APP_TITLE</title>
+
+<!-- ==== Tier 3 core: tags verbatim from references/cdn-manifest.md ==== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"
+        integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"
+        integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"
+        integrity="sha384-x/ilTFv/u/eu6YSmkFDZl5V5Mm/pkxxcVv2cVJOrr1J0rvILhMvRBCy6yA75wYBj" crossorigin="anonymous"></script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+
+<script>
+  /* Theme tokens exposed to Tailwind. Keep in sync with theme.css hues. */
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          surface: { light: "#ffffff", dark: "#1f2229" },
+          canvas:  { light: "#fafaf8", dark: "#16181c" },
+          accent:  { DEFAULT: "#0f5c8c", dark: "#5aa9dd" },
+        },
+        fontFamily: {
+          sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI",
+                 "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { margin: 0; }
+  /* Escape hatch for anything Tailwind is awkward at */
+</style>
+</head>
+<body class="bg-canvas-light dark:bg-canvas-dark font-sans">
+<div id="root"></div>
+
+<!-- ==== embedded data ==== -->
+<script type="application/json" id="app-data">
+{}
+</script>
+
+<!-- ==== EXACTLY ONE babel block. See references/react-babel-traps.md ==== -->
+<script type="text/babel">
+"use strict";
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+/* ---- safe storage ---- */
+const appStorage = (() => {
+  const mem = {};
+  let ok = false;
+  try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); ok = true; }
+  catch (_) {}
+  return {
+    get: (k) => { try { return ok ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch (_) { return mem[k] ?? null; } },
+    set: (k, v) => { try { if (ok) localStorage.setItem(k, v); else mem[k] = v; } catch (_) { mem[k] = v; } },
+  };
+})();
+
+/* ---- dark mode: class strategy + system preference + manual toggle ---- */
+function useTheme() {
+  const [theme, setTheme] = useState(() =>
+    appStorage.get("theme") ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    appStorage.set("theme", theme);
+  }, [theme]);
+  return [theme, () => setTheme((t) => (t === "dark" ? "light" : "dark"))];
+}
+
+/* ---- data ---- */
+const APP_DATA = JSON.parse(document.getElementById("app-data").textContent);
+
+/* ---- error boundary: a readable failure beats a blank page ---- */
+class ErrorBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  render() {
+    if (this.state.err) {
+      return (
+        <div style={{ margin: 24, padding: 16, border: "2px solid #a3312b",
+                      borderRadius: 8, fontFamily: "monospace", color: "#a3312b" }}>
+          <strong>Runtime error</strong>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{String(this.state.err?.stack || this.state.err)}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ---- components: define before use; no imports; one styles object
+        per component if not using Tailwind classes ---- */
+function App() {
+  const [theme, toggleTheme] = useTheme();
+  return (
+    <div className="min-h-screen">
+      <header className="flex items-center justify-between px-4 py-3 border-b
+                         border-neutral-300 dark:border-neutral-700">
+        <strong>APP_TITLE</strong>
+        <button onClick={toggleTheme}
+                className="border rounded px-2 py-1 text-sm
+                           border-neutral-300 dark:border-neutral-700">
+          {theme === "dark" ? "Light" : "Dark"} mode
+        </button>
+      </header>
+      <main className="max-w-5xl mx-auto p-6">
+        {/* APP CONTENT */}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root"))
+  .render(<ErrorBoundary><App /></ErrorBoundary>);
+</script>
+</body>
+</html>

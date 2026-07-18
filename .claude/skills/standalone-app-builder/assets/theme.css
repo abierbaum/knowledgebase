@@ -1,0 +1,64 @@
+/* Design tokens. Inlined into every shell (single-file constraint means
+   this file is a source of truth to copy from, not a runtime link). */
+:root {
+  /* Type: system stack by default; no webfont network dependency */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Type scale (1.250 ratio, 4 working sizes + micro) */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.563rem;
+  --text-2xl: 1.953rem;
+
+  /* Spacing unit: 8px rhythm */
+  --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem; --sp-4: 1rem;
+  --sp-6: 1.5rem; --sp-8: 2rem; --sp-12: 3rem;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  /* Light theme (AA-checked pairs) */
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --border: #d9d9d4;
+  --text: #1a1a18;
+  --text-muted: #5c5c56;
+  --accent: #0f5c8c;
+  --accent-contrast: #ffffff;
+  --positive: #196b3a;
+  --negative: #a3312b;
+  --focus-ring: #0f5c8c;
+}
+
+[data-theme="dark"] {
+  --bg: #16181c;
+  --surface: #1f2229;
+  --border: #363a44;
+  --text: #e8e8e4;
+  --text-muted: #a0a09a;
+  --accent: #5aa9dd;
+  --accent-contrast: #10151a;
+  --positive: #62c98a;
+  --negative: #e4837d;
+  --focus-ring: #5aa9dd;
+}
+
+/* Base application */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.tnum { font-variant-numeric: tabular-nums; }

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<!-- built with standalone-app-builder v0.1.0 | tier: 3 (react) | date: 2026-07-17 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consent Forms Mockup</title>
+
+<!-- ==== Tier 3 core: tags verbatim from references/cdn-manifest.md ==== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"
+        integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"
+        integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"
+        integrity="sha384-x/ilTFv/u/eu6YSmkFDZl5V5Mm/pkxxcVv2cVJOrr1J0rvILhMvRBCy6yA75wYBj" crossorigin="anonymous"></script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+
+<script>
+  /* Theme tokens exposed to Tailwind. Keep in sync with theme.css hues. */
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          surface: { light: "#ffffff", dark: "#1f2229" },
+          canvas:  { light: "#fafaf8", dark: "#16181c" },
+          accent:  { DEFAULT: "#0f5c8c", dark: "#5aa9dd" },
+        },
+        fontFamily: {
+          sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI",
+                 "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { margin: 0; }
+</style>
+</head>
+<body class="bg-canvas-light dark:bg-canvas-dark font-sans">
+<div id="root"></div>
+
+<!-- ==== embedded data (synthetic; no real PII) ==== -->
+<script type="application/json" id="app-data">
+{
+  "student": "Jordan Sample",
+  "forms": [
+    { "id": "f1", "title": "Telehealth services consent", "due": "2026-08-01", "signed": true,
+      "body": "I consent to my student receiving school-based telehealth services during the 2026-27 school year, and understand I may revoke this consent in writing at any time." },
+    { "id": "f2", "title": "Media release", "due": "2026-08-01", "signed": false,
+      "body": "I grant permission for photos of my student to appear in district publications. Names are never published alongside images." },
+    { "id": "f3", "title": "Field trip: science center", "due": "2026-09-12", "signed": false,
+      "body": "I give permission for my student to attend the science center field trip on September 18, 2026, including bus transportation." }
+  ]
+}
+</script>
+
+<!-- ==== EXACTLY ONE babel block. See references/react-babel-traps.md ==== -->
+<script type="text/babel">
+"use strict";
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+/* ---- safe storage ---- */
+const appStorage = (() => {
+  const mem = {};
+  let ok = false;
+  try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); ok = true; }
+  catch (_) {}
+  return {
+    get: (k) => { try { return ok ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch (_) { return mem[k] ?? null; } },
+    set: (k, v) => { try { if (ok) localStorage.setItem(k, v); else mem[k] = v; } catch (_) { mem[k] = v; } },
+  };
+})();
+
+/* ---- dark mode ---- */
+function useTheme() {
+  const [theme, setTheme] = useState(() =>
+    appStorage.get("theme") ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    appStorage.set("theme", theme);
+  }, [theme]);
+  return [theme, () => setTheme((t) => (t === "dark" ? "light" : "dark"))];
+}
+
+/* ---- data ---- */
+const APP_DATA = JSON.parse(document.getElementById("app-data").textContent);
+
+/* ---- error boundary ---- */
+class ErrorBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  render() {
+    if (this.state.err) {
+      return (
+        <div style={{ margin: 24, padding: 16, border: "2px solid #a3312b",
+                      borderRadius: 8, fontFamily: "monospace", color: "#a3312b" }}>
+          <strong>Runtime error</strong>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{String(this.state.err?.stack || this.state.err)}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ---- components (define before use; navigation is state, never hrefs) ---- */
+function Badge({ signed }) {
+  return signed ? (
+    <span className="text-xs px-2 py-0.5 rounded border border-green-700 text-green-800 dark:border-green-400 dark:text-green-300">Signed</span>
+  ) : (
+    <span className="text-xs px-2 py-0.5 rounded border border-amber-700 text-amber-800 dark:border-amber-400 dark:text-amber-300">Needs signature</span>
+  );
+}
+
+function ListScreen({ forms, onOpen }) {
+  const pending = forms.filter((f) => !f.signed).length;
+  return (
+    <div>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+        {pending === 0 ? "All forms are signed." : `${pending} form${pending === 1 ? "" : "s"} awaiting your signature.`}
+      </p>
+      <ul className="space-y-2">
+        {forms.map((f) => (
+          <li key={f.id}>
+            <button onClick={() => onOpen(f.id)}
+                    className="w-full text-left flex items-center justify-between gap-3 p-4 rounded-lg border
+                               bg-surface-light dark:bg-surface-dark
+                               border-neutral-300 dark:border-neutral-700
+                               hover:border-accent dark:hover:border-accent-dark">
+              <span>
+                <span className="block font-medium text-neutral-900 dark:text-neutral-100">{f.title}</span>
+                <span className="block text-xs text-neutral-600 dark:text-neutral-400 tabular-nums">Due {f.due}</span>
+              </span>
+              <Badge signed={f.signed} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function DetailScreen({ form, onBack, onSign }) {
+  const [name, setName] = useState("");
+  const canSign = name.trim().length > 1;
+  return (
+    <div>
+      <button onClick={onBack} className="text-sm text-accent dark:text-accent-dark mb-4">&larr; All forms</button>
+      <div className="p-5 rounded-lg border bg-surface-light dark:bg-surface-dark border-neutral-300 dark:border-neutral-700">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{form.title}</h2>
+          <Badge signed={form.signed} />
+        </div>
+        <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-5">{form.body}</p>
+        {form.signed ? (
+          <p className="text-sm text-green-800 dark:text-green-300">Signed on file for {APP_DATA.student}.</p>
+        ) : (
+          <div>
+            <label htmlFor="sig" className="block text-sm text-neutral-600 dark:text-neutral-400 mb-1">
+              Type your full name to sign
+            </label>
+            <input id="sig" value={name} onChange={(e) => setName(e.target.value)}
+                   placeholder="Parent / guardian name" autoComplete="off"
+                   className="w-full mb-3 px-3 py-2 rounded border bg-canvas-light dark:bg-canvas-dark
+                              border-neutral-300 dark:border-neutral-700
+                              text-neutral-900 dark:text-neutral-100" />
+            <button disabled={!canSign} onClick={() => onSign(form.id, name.trim())}
+                    className="px-4 py-2 rounded text-white bg-accent dark:bg-accent-dark dark:text-neutral-900
+                               disabled:opacity-40 disabled:cursor-not-allowed">
+              Sign form
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DoneScreen({ form, signer, onBack }) {
+  return (
+    <div className="p-5 rounded-lg border bg-surface-light dark:bg-surface-dark border-neutral-300 dark:border-neutral-700">
+      <h2 className="text-lg font-semibold mb-2 text-neutral-900 dark:text-neutral-100">Signature recorded</h2>
+      <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-4">
+        "{form.title}" was signed by {signer} for {APP_DATA.student}. A copy has been
+        sent to the school office (mockup — nothing was actually sent).
+      </p>
+      <button onClick={onBack}
+              className="px-4 py-2 rounded text-white bg-accent dark:bg-accent-dark dark:text-neutral-900">
+        Back to all forms
+      </button>
+    </div>
+  );
+}
+
+function App() {
+  const [theme, toggleTheme] = useTheme();
+  const [screen, setScreen] = useState("list");   // "list" | "detail" | "done"
+  const [forms, setForms] = useState(APP_DATA.forms);
+  const [activeId, setActiveId] = useState(null);
+  const [signer, setSigner] = useState("");
+  const active = forms.find((f) => f.id === activeId);
+
+  const sign = (id, name) => {
+    setForms((fs) => fs.map((f) => (f.id === id ? { ...f, signed: true } : f)));
+    setSigner(name);
+    setScreen("done");
+  };
+
+  return (
+    <div className="min-h-screen">
+      <header className="flex items-center justify-between px-4 py-3 border-b
+                         border-neutral-300 dark:border-neutral-700">
+        <strong className="text-neutral-900 dark:text-neutral-100">Consent Forms &middot; {APP_DATA.student}</strong>
+        <button onClick={toggleTheme}
+                className="border rounded px-2 py-1 text-sm
+                           border-neutral-300 dark:border-neutral-700
+                           text-neutral-900 dark:text-neutral-100">
+          {theme === "dark" ? "Light" : "Dark"} mode
+        </button>
+      </header>
+      <main className="max-w-xl mx-auto p-6">
+        {screen === "list" && <ListScreen forms={forms} onOpen={(id) => { setActiveId(id); setScreen("detail"); }} />}
+        {screen === "detail" && active && <DetailScreen form={active} onBack={() => setScreen("list")} onSign={sign} />}
+        {screen === "done" && active && <DoneScreen form={active} signer={signer} onBack={() => setScreen("list")} />}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root"))
+  .render(<ErrorBoundary><App /></ErrorBoundary>);
+</script>
+</body>
+</html>

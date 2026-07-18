@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<!-- built with standalone-app-builder v0.1.0 | tier: 2 (enhanced) | date: 2026-07-17 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Dashboard</title>
+
+<!-- Chart.js: tag verbatim from references/cdn-manifest.md -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"
+        integrity="sha384-XcdcwHqIPULERb2yDEM4R0XaQKU3YnDsrTmjACBZyfdVVqjh6xQ4/DCMd7XLcA6Y" crossorigin="anonymous"></script>
+
+<style>
+  /* ==== tokens (from assets/theme.css; keep in sync) ==== */
+  :root {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+    --text-xl: 1.563rem;
+    --text-2xl: 1.953rem;
+    --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem; --sp-4: 1rem;
+    --sp-6: 1.5rem; --sp-8: 2rem; --sp-12: 3rem;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --bg: #fafaf8;
+    --surface: #ffffff;
+    --border: #d9d9d4;
+    --text: #1a1a18;
+    --text-muted: #5c5c56;
+    --accent: #0f5c8c;
+    --accent-contrast: #ffffff;
+    --positive: #196b3a;
+    --negative: #a3312b;
+    --focus-ring: #0f5c8c;
+  }
+  [data-theme="dark"] {
+    --bg: #16181c;
+    --surface: #1f2229;
+    --border: #363a44;
+    --text: #e8e8e4;
+    --text-muted: #a0a09a;
+    --accent: #5aa9dd;
+    --accent-contrast: #10151a;
+    --positive: #62c98a;
+    --negative: #e4837d;
+    --focus-ring: #5aa9dd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ==== app styles ==== */
+  /* System declaration: type scale 1.250 / 8px rhythm / palette per tokens */
+  main { max-width: 1200px; margin: 0 auto; padding: var(--sp-6) var(--sp-4); }
+  header.app { display: flex; align-items: center; justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
+  header.app .range { font-size: var(--text-sm); color: var(--text-muted); }
+  button.icon { background: none; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: var(--sp-1) var(--sp-2);
+    color: var(--text); cursor: pointer; font: inherit; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--sp-4); margin-bottom: var(--sp-6); }
+  .kpi { background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: var(--sp-4); }
+  .kpi .value { font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
+  .kpi .label { font-size: var(--text-sm); color: var(--text-muted); }
+  .kpi .delta { font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+  .kpi .delta.up { color: var(--positive); }
+  .kpi .delta.down { color: var(--negative); }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+  @media (max-width: 800px) { .charts { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: var(--sp-4); }
+  .panel h2 { margin: 0 0 var(--sp-3); font-size: var(--text-base); }
+  .chart-box { position: relative; height: 260px; }
+
+  @media print {
+    header.app button { display: none; }
+    body { background: #ffffff; color: #000000; }
+    .charts { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <strong>Session Dashboard</strong>
+  <span class="range">Jan&ndash;Jun 2026 &middot; synthetic data</span>
+  <button class="icon" id="theme-toggle" aria-label="Toggle theme">Theme</button>
+</header>
+<main id="app">
+  <div class="kpis" id="kpis"></div>
+  <div class="charts">
+    <section class="panel">
+      <h2>Total sessions per month</h2>
+      <div class="chart-box"><canvas id="chart-monthly" role="img"
+        aria-label="Line chart of total sessions per month"></canvas></div>
+    </section>
+    <section class="panel">
+      <h2>Sessions by district</h2>
+      <div class="chart-box"><canvas id="chart-district" role="img"
+        aria-label="Bar chart of total sessions by district"></canvas></div>
+    </section>
+  </div>
+</main>
+
+<!-- ==== embedded data (synthetic; see references/data-embedding.md) ==== -->
+<script type="application/json" id="app-data">
+{
+  "generated": "2026-07-17",
+  "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+  "districts": [
+    { "name": "North Valley CSD", "sessions": [112, 128, 141, 133, 156, 171] },
+    { "name": "Prairie Ridge CSD", "sessions": [86, 91, 104, 118, 121, 134] },
+    { "name": "Lakeview CSD", "sessions": [64, 58, 72, 81, 77, 92] },
+    { "name": "Cedar Bluffs CSD", "sessions": [41, 47, 44, 53, 60, 66] }
+  ]
+}
+</script>
+
+<script>
+"use strict";
+
+/* ---- safe storage (never call localStorage bare) ---- */
+const appStorage = (() => {
+  const mem = {};
+  let ok = false;
+  try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); ok = true; }
+  catch (_) { ok = false; }
+  return {
+    get: (k) => { try { return ok ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch (_) { return mem[k] ?? null; } },
+    set: (k, v) => { try { if (ok) localStorage.setItem(k, v); else mem[k] = v; } catch (_) { mem[k] = v; } },
+  };
+})();
+
+/* ---- theme ---- */
+(() => {
+  const saved = appStorage.get("theme");
+  const preferDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = saved || (preferDark ? "dark" : "light");
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    appStorage.set("theme", next);
+  });
+})();
+
+const APP_DATA = JSON.parse(document.getElementById("app-data").textContent);
+
+/* ---- app logic ---- */
+(() => {
+  const fmt = (n) => n.toLocaleString("en-US");
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  /* One shared color array for all charts */
+  const palette = ["#0f5c8c", "#5aa9dd", "#196b3a", "#c98a2c"];
+
+  /* KPIs */
+  const monthTotals = APP_DATA.months.map((_, i) =>
+    APP_DATA.districts.reduce((s, d) => s + d.sessions[i], 0));
+  const total = monthTotals.reduce((a, b) => a + b, 0);
+  const last = monthTotals[monthTotals.length - 1];
+  const prev = monthTotals[monthTotals.length - 2];
+  const deltaPct = ((last - prev) / prev) * 100;
+  const avg = Math.round(total / APP_DATA.months.length);
+  const top = [...APP_DATA.districts]
+    .sort((a, b) => b.sessions.reduce((x, y) => x + y, 0) - a.sessions.reduce((x, y) => x + y, 0))[0];
+
+  const kpis = [
+    { label: "Total sessions", value: fmt(total), delta: null },
+    { label: "Avg per month", value: fmt(avg), delta: null },
+    { label: "Latest month", value: fmt(last),
+      delta: `${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(1)}% vs prior`, dir: deltaPct >= 0 ? "up" : "down" },
+    { label: "Top district", value: top.name, delta: null },
+  ];
+  const kpiRoot = document.getElementById("kpis");
+  kpis.forEach((k) => {
+    const card = document.createElement("div");
+    card.className = "kpi";
+    const v = document.createElement("div"); v.className = "value"; v.textContent = k.value;
+    const l = document.createElement("div"); l.className = "label"; l.textContent = k.label;
+    card.append(v, l);
+    if (k.delta) {
+      const d = document.createElement("div");
+      d.className = "delta " + k.dir; d.textContent = k.delta;
+      card.append(d);
+    }
+    kpiRoot.append(card);
+  });
+
+  /* Charts (rebuilt on theme toggle so axis/grid colors follow tokens) */
+  let charts = [];
+  function buildCharts() {
+    charts.forEach((c) => c.destroy());
+    Chart.defaults.color = css("--text-muted");
+    Chart.defaults.borderColor = css("--border");
+    Chart.defaults.font.family = css("--font-sans");
+    charts = [
+      new Chart(document.getElementById("chart-monthly"), {
+        type: "line",
+        data: {
+          labels: APP_DATA.months,
+          datasets: [{ label: "Total sessions", data: monthTotals,
+            borderColor: css("--accent"), backgroundColor: css("--accent"), tension: 0.2 }],
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } } },
+      }),
+      new Chart(document.getElementById("chart-district"), {
+        type: "bar",
+        data: {
+          labels: APP_DATA.districts.map((d) => d.name),
+          datasets: [{ label: "Sessions",
+            data: APP_DATA.districts.map((d) => d.sessions.reduce((a, b) => a + b, 0)),
+            backgroundColor: palette }],
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } } },
+      }),
+    ];
+  }
+  buildCharts();
+  /* Runs after the shell's toggle handler has flipped data-theme */
+  document.getElementById("theme-toggle").addEventListener("click", buildCharts);
+})();
+</script>
+</body>
+</html>

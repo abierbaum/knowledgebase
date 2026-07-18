@@ -25,12 +25,14 @@ Project skills live in `.claude/skills/` — each is a folder with a `SKILL.md` 
 | `obsidian-bases` | Touching a `.base` file — table/cards/list/map views, filters, formulas, summaries | `references/FUNCTIONS_REFERENCE.md` (formula functions) |
 | `json-canvas` | Touching a `.canvas` file — nodes, edges, groups, connections | `references/EXAMPLES.md` (complete canvas examples) |
 | `defuddle` | User gives a URL to read/analyze — cleaner and cheaper than WebFetch. Skip for URLs ending in `.md` | — |
+| `standalone-app-builder` | User asks for a single-file HTML app, tool, dashboard, mockup, or "something I can open in a browser" — no build step | `references/` (cdn-manifest, app-patterns, react-babel-traps, …) |
 
 Routing:
 - Editing note *syntax* → `obsidian-markdown` first.
 - Moving, renaming, or searching *files* → `obsidian-cli` (never `mv`, per hard rule #1).
 - `.base` or `.canvas` file → the matching skill **before** opening the file; both formats break silently on invalid structure.
 - Fetching a web page → `defuddle` before reaching for WebFetch.
+- Any single-file / standalone HTML request → `standalone-app-builder`; other design guidance may inform polish, but its manifest and tier rules win inside that skill.
 
 Skill instructions cover generic Obsidian; **this file's conventions (frontmatter schema, naming, tags) are vault policy and win on conflict.**
 
